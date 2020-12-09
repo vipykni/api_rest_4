@@ -1,99 +1,105 @@
-
-// Create the namespace instance
-let ns = {};
-
-// Create the model instance
-ns.model = (function () {
-    'use strict';
-
-    // Return the API
-    return {
-        'read': function () {
-            let ajax_options = {
-                type: 'GET',
-                url: '/api/notes',
-                accepts: 'application/json',
-                dataType: 'json'
-            };
-            return $.ajax(ajax_options);
-        }
-    };
-}());
-
-
-// Create the view instance
-ns.view = (function () {
-    'use strict';
-
-    var $table = $(".blog table");
-
-    // Return the API
-    return {
-        build_table: function (data) {
-            let source = $('#blog-table-template').html(),
-                template = Handlebars.compile(source),
-                html;
-
-            // Create the HTML from the template and notes
-            html = template({notes: data});
-
-            // Append the rows to the table tbody
-            $table.append(html);
-        },
-        error: function (error_msg) {
-            $('.error')
-                .text(error_msg)
-                .css('visibility', 'visible');
-            setTimeout(function () {
-                $('.error').fadeOut();
-            }, 2000)
-        }
-    };
-}());
-
-
-// Create the controller instance
-ns.controller = (function (m, v) {
-    'use strict';
-
-    let model = m,
-        view = v;
-
-    // Get the note data from the model after the controller is done initializing
-    setTimeout(function () {
-
-        // Attach event handlers to the promise returned by model.read()
-        model.read()
-            .done(function (data) {
-                view.build_table(data);
-            })
-            .fail(function (xhr, textStatus, errorThrown) {
-                error_handler(xhr, textStatus, errorThrown);
-            });
-    }, 100);
-
-    // generic error handler
-    function error_handler(xhr, textStatus, errorThrown) {
-        let error_msg = `${textStatus}: ${errorThrown} - ${xhr.responseJSON.detail}`;
-
-        view.error(error_msg);
-        console.log(error_msg);
+class Model {
+    async read() {
+        let options = {
+            method: "GET",
+            cache: "no-cache",
+            headers: {
+                "Content-Type": "application/json"
+                "accepts": "application/json"
+            }
+        };
+        // Вызовите конечную точку REST и дождитесь данных
+        let response = await fetch(`/api/people`, options);
+        let data = await response.json();
+        return data;
     }
+}
+class View {
+    constructor() {
+        this.table = document.querySelector(".people table");
+        this.person_id = document.getElementById("person_id");
+        this.fname = document.getElementById("fname");
+        this.lname = document.getElementById("lname");
+    }
+    reset() {
+        this.person_id.textContent = "";
+        this.lname.value = "";
+        this.fname.value = "";
+        this.fname.focus();
+    }
+    buildTable(people) {
+        let tbody,
+            html = "";
+        // Перебирай людей и создавай таблицу
+        people.forEach((person) => {
+            html += `
 
-    // handle application events
-    $('table').on('dblclick', 'tbody td.name', function (e) {
-        let $target = $(e.target).parent(),
-            person_id = $target.data('person_id');
+                ${person.timestamp}
+                ${person.fname} ${person.lname}
+            `;
+        });
+        // В настоящее время в таблице есть кто-то еще?
+        if (this.table.tBodies.length !== 0) {
+            this.table.removeChild(this.table.getElementsByTagName("tbody")[0]);
+        }
+        // Обновите tbody нашим новым контентом
+        tbody = this.table.createTBody();
+        tbody.innerHTML = html;
+    }
+}
 
-        window.location = `/people/${person_id}`;
+class Controller {
+    constructor(model, view) {
+        this.model = model;
+        this.view = view;
+        this.initialize();
+    }
+    async initialize() {
+        await this.initializeTable();
+    }
+    async initializeTable() {
+        try {
+            let urlPersonId = parseInt(document.getElementById("url_person_id").value),
+                people = await this.model.read();
+            this.view.buildTable(people);
+            // Мы сориентировались здесь с выбранным человеком?
+            if (urlPersonId) {
+                let person = await this.model.readOne(urlPersonId);
+                this.view.updateEditor(person);
+                this.view.setButtonState(this.view.EXISTING_NOTE);
+            // В противном случае, нет, так что оставьте редактор пустым
+            } else {
+                this.view.reset();
+                this.view.setButtonState(this.view.NEW_NOTE);
+            }
+            this.initializeTableEvents();
+        } catch (err) {
+            this.view.errorMessage(err);
+        }
+    }
+    initializeCreateEvent() {
+        document.getElementById("create").addEventListener("click", async (evt) => {
+            let fname = document.getElementById("fname").value,
+                lname = document.getElementById("lname").value;
+            evt.preventDefault();
+            try {
+                await this.model.create({
+                    fname: fname,
+                    lname: lname
+                });
+                await this.initializeTable();
+            } catch(err) {
+                this.view.errorMessage(err);
+            }
+        });
+    }
+}
+const model = new Model();
+const view = new View();
+const controller = new Controller(model, view);
 
-    });
-
-    $('table').on('dblclick', 'tbody td.content', function (e) {
-        let $target = $(e.target).parent(),
-            person_id = $target.data('person_id'),
-            note_id = $target.data('note_id');
-
-        window.location = `people/${person_id}/notes/${note_id}`;
-    });
-}(ns.model, ns.view));
+export default {
+    model,
+    view,
+    controller
+};

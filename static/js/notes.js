@@ -1,297 +1,278 @@
-
-// Create the namespace instance
-let ns = {};
-
-// Create the model instance
-ns.model = (function () {
-    'use strict';
-
-    // Return the API
-    return {
-        read_one: function (person_id, note_id) {
-            let ajax_options = {
-                type: 'GET',
-                url: `/api/people/${person_id}/notes/${note_id}`,
-                accepts: 'application/json',
-                dataType: 'json'
-            };
-            return $.ajax(ajax_options);
-        },
-        read: function (person_id) {
-            let ajax_options = {
-                type: 'GET',
-                url: `/api/people/${person_id}`,
-                accepts: 'application/json',
-                dataType: 'json'
-            };
-            return $.ajax(ajax_options);
-        },
-        create: function (person_id, note) {
-            let ajax_options = {
-                type: 'POST',
-                url: `/api/people/${person_id}/notes`,
-                accepts: 'application/json',
-                contentType: 'application/json',
-                dataType: 'json',
-                data: JSON.stringify(note)
-            };
-            return $.ajax(ajax_options);
-        },
-        update: function (person_id, note) {
-            let ajax_options = {
-                type: 'PUT',
-                url: `/api/people/${person_id}/notes/${note.note_id}`,
-                accepts: 'application/json',
-                contentType: 'application/json',
-                dataType: 'json',
-                data: JSON.stringify(note)
-            };
-            return $.ajax(ajax_options);
-        },
-        'delete': function (person_id, note_id) {
-            let ajax_options = {
-                type: 'DELETE',
-                url: `/api/people/${person_id}/notes/${note_id}`,
-                accepts: 'application/json',
-                contentType: 'plain/text'
-            };
-            return $.ajax(ajax_options);
-        }
-    };
-}());
-
-// Create the view instance
-ns.view = (function () {
-    'use strict';
-
-    const NEW_NOTE = 0,
-        EXISTING_NOTE = 1;
-
-    let $person_id = $('#person_id'),
-        $fname = $('#fname'),
-        $lname = $('#lname'),
-        $timestamp = $('#timestamp'),
-        $note_id = $('#note_id'),
-        $note = $('#note'),
-        $create = $('#create'),
-        $update = $('#update'),
-        $delete = $('#delete'),
-        $reset = $('#reset');
-
-    // return the API
-    return {
-        NEW_NOTE: NEW_NOTE,
-        EXISTING_NOTE: EXISTING_NOTE,
-        reset: function () {
-            $note_id.text('');
-            $note.val('').focus();
-        },
-        update_editor: function (note) {
-            $note_id.text(note.note_id);
-            $note.val(note.content).focus();
-        },
-        set_button_states: function (state) {
-            if (state === NEW_NOTE) {
-                $create.prop('disabled', false);
-                $update.prop('disabled', true);
-                $delete.prop('disabled', true);
-            } else if (state === EXISTING_NOTE) {
-                $create.prop('disabled', true);
-                $update.prop('disabled', false);
-                $delete.prop('disabled', false);
+class Model {
+    async read(personId) {
+        let options = {
+            method: "GET",
+            cache: "no-cache",
+            headers: {
+                "Content-Type": "application/json"
             }
-        },
-        build_table: function (person) {
-            let source = $('#notes-table-template').html(),
-                template = Handlebars.compile(source),
-                html;
-
-            // update the person data
-            $person_id.text(person.person_id);
-            $fname.text(person.fname);
-            $lname.text(person.lname);
-            $timestamp.text(person.timestamp);
-
-            // clear the table
-            $('.notes table > tbody').empty();
-
-            // did we get a note array?
-            if (person.notes) {
-
-                // Create the HTML from the template and notes
-                html = template({notes: person.notes});
-
-                // Append the html to the table
-                $('table').append(html);
-            }
-        },
-        error: function (error_msg) {
-            $('.error')
-                .text(error_msg)
-                .css('visibility', 'visible');
-            setTimeout(function () {
-                $('.error').fadeOut();
-            }, 2000)
-        }
-    };
-}());
-
-// Create the controller
-ns.controller = (function (m, v) {
-    'use strict';
-
-    let model = m,
-        view = v,
-        $url_person_id = $('#url_person_id'),
-        $url_note_id = $('#url_note_id'),
-        $note_id = $('#note_id'),
-        $note = $('#note');
-
-    // read the person data with notes
-    setTimeout(function () {
-        view.reset();
-        model.read(parseInt($url_person_id.val()))
-            .done(function (data) {
-                view.build_table(data);
-                view.update_editor(data);
-                view.set_button_states(view.NEW_NOTE);
-            })
-            .fail(function (xhr, textStatus, errorThrown) {
-                error_handler(xhr, textStatus, errorThrown);
-            });
-
-        if ($url_note_id.val() !== "") {
-            model.read_one(parseInt($url_person_id.val()), parseInt($url_note_id.val()))
-                .done(function (data) {
-                    view.update_editor(data);
-                    view.set_button_states(view.EXISTING_NOTE);
-                })
-                .fail(function (xhr, textStatus, errorThrown) {
-                    error_handler(xhr, textStatus, errorThrown);
-                });
-        }
-    }, 100);
-
-    // generic error handler
-    function error_handler(xhr, textStatus, errorThrown) {
-        let error_msg = `${textStatus}: ${errorThrown} - ${xhr.responseJSON.detail}`;
-
-        view.error(error_msg);
-        console.log(error_msg);
+        };
+        let response = await fetch(`/api/people/${personId}`, options);
+        let data = await response.json();
+        return data;
     }
 
-    // initialize the button states
-    view.set_button_states(view.NEW_NOTE);
-
-    // Validate input
-    function validate(note) {
-        return note !== "";
+    async readOne(personId, noteId) {
+        let options = {
+            method: "GET",
+            cache: "no-cache",
+            headers: {
+                "Content-Type": "application/json",
+                "accepts": "application/json"
+            }
+        };
+        let response = await fetch(`/api/people/${personId}/notes/${noteId}`, options);
+        let data = await response.json();
+        return data;
     }
 
-    // Create our event handlers
-    $('#create').click(function (e) {
-        let note = $note.val();
+    async create(personId, note) {
+        let options = {
+            method: "POST",
+            cache: "no-cache",
+            headers: {
+                "Content-Type": "application/json",
+                "accepts": "application/json"
+            },
+            body: JSON.stringify(note)
+        };
+        let response = await fetch(`/api/people/${personId}/notes`, options);
+        let data = await response.json();
+        return data;
+    }
 
-        e.preventDefault();
+    async update(personId, note) {
+        let options = {
+            method: "PUT",
+            cache: "no-cache",
+            headers: {
+                "Content-Type": "application/json",
+                "accepts": "application/json"
+            },
+            body: JSON.stringify(note)
+        };
+        let response = await fetch(`/api/people/${personId}/notes/${note.noteId}`, options);
+        let data = await response.json();
+        return data;
+    }
 
-        if (validate(note)) {
-            model.create(parseInt($('#url_person_id').val()), {
-                content: note
-            })
-                .done(function (data) {
-                    model.read(parseInt($('#url_person_id').val()))
-                        .done(function(data) {
-                            view.build_table(data);
-                        })
-                        .fail(function(xhr, textStatus, errorThrown) {
-                            error_handler(xhr, textStatus, errorThrown);
-                        });
-                    view.reset();
-                    view.set_button_states(view.NEW_NOTE);
-                })
-                .fail(function (xhr, textStatus, errorThrown) {
-                    error_handler(xhr, textStatus, errorThrown);
-                });
+    async delete(personId, noteId) {
+        let options = {
+            method: "DELETE",
+            cache: "no-cache",
+            headers: {
+                "Content-Type": "application/json",
+                "accepts": "application/json"
+            }
+        };
+        let response = await fetch(`/api/people/${personId}/notes/${noteId}`, options);
+        return response;
+    }
+}
 
-        } else {
-            alert('Problem with note input');
+
+
+class View {
+    constructor() {
+        this.NEW_NOTE = 0;
+        this.EXISTING_NOTE = 1;
+        this.table = document.querySelector(".notes table");
+        this.error = document.querySelector(".error");
+        this.personId = document.getElementById("person_id");
+        this.fname = document.getElementById("fname");
+        this.lname = document.getElementById("lname");
+        this.timestamp = document.getElementById("timestamp");
+        this.noteId = document.getElementById("note_id");
+        this.note = document.getElementById("note");
+        this.createButton = document.getElementById("create");
+        this.updateButton = document.getElementById("update");
+        this.deleteButton = document.getElementById("delete");
+        this.resetButton = document.getElementById("reset");
+    }
+
+    reset() {
+        this.noteId.textContent = "";
+        this.note.value = "";
+        this.note.focus();
+    }
+
+    updateEditor(note) {
+        this.noteId.textContent = note.noteId;
+        this.note.value = note.content;
+        this.note.focus();
+    }
+
+    setButtonState(state) {
+        if (state === this.NEW_NOTE) {
+            this.createButton.disabled = false;
+            this.updateButton.disabled = true;
+            this.deleteButton.disabled = true;
+        } else if (state === this.EXISTING_NOTE) {
+            this.createButton.disabled = true;
+            this.updateButton.disabled = false;
+            this.deleteButton.disabled = false;
         }
-    });
+    }
 
-    $('#update').click(function (e) {
-        let person_id = parseInt($url_person_id.val()),
-            note_id = parseInt($note_id.text()),
-            note = $note.val();
+    buildTable(person) {
+        let tbody,
+            html = "";
 
-        e.preventDefault();
+        this.personId.textContent = person.person_id;
+        this.fname.textContent = person.fname;
+        this.lname.textContent = person.lname;
+        this.timestamp.textContent = person.timestamp;
 
-        if (validate(note)) {
-            model.update(person_id, {
-                note_id: note_id,
-                content: note
-            })
-                .done(function (data) {
-                    model.read(data.person.person_id)
-                        .done(function(data) {
-                            view.build_table(data);
-                        })
-                        .fail(function(xhr, textStatus, errorThrown) {
-                            error_handler(xhr, textStatus, errorThrown);
-                        });
-                    view.reset();
-                    view.set_button_states(view.NEW_NOTE);
-                })
-                .fail(function (xhr, textStatus, errorThrown) {
-                    error_handler(xhr, textStatus, errorThrown);
-                });
-
-        } else {
-            alert('Problem with first or last name input');
-        }
-    });
-
-    $('#delete').click(function (e) {
-        let person_id = parseInt($url_person_id.val()),
-            note_id = parseInt($note_id.text());
-
-        e.preventDefault();
-
-        if (validate('placeholder', lname)) {
-            model.delete(person_id, note_id)
-                .done(function (data) {
-                    model.read(parseInt($('#url_person_id').val()))
-                        .done(function(data) {
-                            view.build_table(data);
-                        })
-                        .fail(function(xhr, textStatus, errorThrown) {
-                            error_handler(xhr, textStatus, errorThrown);
-                        });
-                    view.reset();
-                    view.set_button_states(view.NEW_NOTE);
-                })
-                .fail(function (xhr, textStatus, errorThrown) {
-                    error_handler(xhr, textStatus, errorThrown);
-                });
-
-        } else {
-            alert('Problem with first or last name input');
-        }
-    });
-
-    $('#reset').click(function () {
-        view.reset();
-        view.set_button_states(view.NEW_NOTE);
-    })
-
-    $('table').on('click', 'tbody tr', function (e) {
-        let $target = $(e.target).parent(),
-            note_id = $target.data('note_id'),
-            content = $target.data('content');
-
-        view.update_editor({
-            note_id: note_id,
-            content: content,
+        person.notes.forEach((note) => {
+            html += `
+            <tr data-note_id="${note.note_id}" data-content="${note.content}">
+                <td class="timestamp">${note.timestamp}</td>
+                <td class="content">${note.content}</td>
+            </tr>`;
         });
-        view.set_button_states(view.EXISTING_NOTE);
-    });
-}(ns.model, ns.view));
+        if (this.table.tBodies.length !== 0) {
+            this.table.removeChild(this.table.getElementsByTagName("tbody")[0]);
+        }
+        tbody = this.table.createTBody();
+        tbody.innerHTML = html;
+    }
+
+    errorMessage(error_msg) {
+        let error = document.querySelector(".error");
+
+        error.innerHTML = error_msg;
+        error.classList.add("visible");
+        error.classList.remove("hidden");
+        setTimeout(() => {
+            error.classList.add("hidden");
+            error.classList.remove("visible");
+        }, 2000);
+    }
+}
+
+
+
+class Controller {
+    constructor(model, view) {
+        this.model = model;
+        this.view = view;
+
+        this.initialize();
+    }
+
+    async initialize() {
+        await this.initializeTable();
+        this.initializeTableEvents();
+        this.initializeCreateEvent();
+        this.initializeUpdateEvent();
+        this.initializeDeleteEvent();
+        this.initializeResetEvent();
+    }
+
+    async initializeTable() {
+        try {
+            let urlPersonId = +document.getElementById("url_person_id").value,
+                urlNoteId = +document.getElementById("url_note_id").value,
+                person = await this.model.read(urlPersonId);
+
+            this.view.buildTable(person);
+
+            if (urlNoteId) {
+                let note = await this.model.readOne(urlPersonId, urlNoteId);
+                this.view.updateEditor(note);
+                this.view.setButtonState(this.view.EXISTING_NOTE);
+
+            } else {
+                this.view.reset();
+                this.view.setButtonState(this.view.NEW_NOTE);
+            }
+            this.initializeTableEvents();
+        } catch (err) {
+            this.view.errorMessage(err);
+        }
+    }
+
+    initializeTableEvents() {
+        document.querySelector("table tbody").addEventListener("click", (evt) => {
+            let target = evt.target.parentElement,
+                noteId = target.getAttribute("data-note_id"),
+                content = target.getAttribute("data-content");
+
+            this.view.updateEditor({
+                noteId: noteId,
+                content: content
+            });
+            this.view.setButtonState(this.view.EXISTING_NOTE);
+        });
+    }
+
+    initializeCreateEvent() {
+        document.getElementById("create").addEventListener("click", async (evt) => {
+            let urlPersonId = +document.getElementById("person_id").textContent,
+                note = document.getElementById("note").value;
+
+            evt.preventDefault();
+            try {
+                await this.model.create(urlPersonId, {
+                    content: note
+                });
+                await this.initializeTable();
+            } catch(err) {
+                this.view.errorMessage(err);
+            }
+        });
+    }
+
+    initializeUpdateEvent() {
+        document.getElementById("update").addEventListener("click", async (evt) => {
+            let personId = +document.getElementById("person_id").textContent,
+                noteId = +document.getElementById("note_id").textContent,
+                note = document.getElementById("note").value;
+
+            evt.preventDefault();
+            try {
+                await this.model.update(personId, {
+                    personId: personId,
+                    noteId: noteId,
+                    content: note
+                });
+                await this.initializeTable();
+            } catch(err) {
+                this.view.errorMessage(err);
+            }
+        });
+    }
+
+    initializeDeleteEvent() {
+        document.getElementById("delete").addEventListener("click", async (evt) => {
+            let personId = +document.getElementById("person_id").textContent,
+                noteId = +document.getElementById("note_id").textContent;
+
+            evt.preventDefault();
+            try {
+                await this.model.delete(personId, noteId);
+                await this.initializeTable();
+            } catch(err) {
+                this.view.errorMessage(err);
+            }
+        });
+    }
+
+    initializeResetEvent() {
+        document.getElementById("reset").addEventListener("click", async (evt) => {
+            evt.preventDefault();
+            this.view.reset();
+            this.view.setButtonState(this.view.NEW_NOTE);
+        });
+    }
+}
+
+const model = new Model();
+const view = new View();
+const controller = new Controller(model, view);
+
+export default {
+    model,
+    view,
+    controller
+};
